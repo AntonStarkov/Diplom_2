@@ -1,18 +1,19 @@
+import io.qameta.allure.Description;
+import io.qameta.allure.junit4.DisplayName;
 import io.restassured.RestAssured;
-import io.restassured.response.Response;
 import org.junit.*;
 import org.junit.rules.TestName;
 import ru.yandex.praktikum.StellarBurgersService;
 import ru.yandex.praktikum.pojo.createorder.CreateOrderDeserialization;
 import ru.yandex.praktikum.pojo.createuser.CreateUserDeserialization;
 import ru.yandex.praktikum.pojo.loginuser.LoginUserDeserialization;
+import ru.yandex.praktikum.pojo.takeorder.Orders;
 import ru.yandex.praktikum.pojo.takeorder.TakeOrderDeserialization;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
-import static ru.yandex.praktikum.StellarBurgersService.JSON_TO_CREATE_USER;
-import static ru.yandex.praktikum.StellarBurgersService.JSON_TO_LOGIN_USER;
+import java.util.Map;
 
 public class TakeUsersOrderTest {
     private StellarBurgersService stellarBurgersService;
@@ -21,34 +22,43 @@ public class TakeUsersOrderTest {
     public TestName testName = new TestName();
     @Before
     public void setUp() {
-        RestAssured.baseURI = "https://stellarburgers.nomoreparties.site";
+        RestAssured.requestSpecification = StellarBurgersService.requestSpec;
         stellarBurgersService = new StellarBurgersService();
-        if(stellarBurgersService.loginUserResponse(JSON_TO_LOGIN_USER).getStatusCode() == 200){
-            LoginUserDeserialization loginUserDeserialization = stellarBurgersService.loginUserResponse(JSON_TO_LOGIN_USER).as(LoginUserDeserialization.class);
+        Map<String,String> userData = stellarBurgersService.userData();
+        Map<String,String> userDataToLogin = new HashMap<>(userData);
+        userDataToLogin.remove("name");
+        if(stellarBurgersService.loginUserResponse(userDataToLogin).getStatusCode() == 200){
+            LoginUserDeserialization loginUserDeserialization = stellarBurgersService.loginUserResponse(userDataToLogin).as(LoginUserDeserialization.class);
             stellarBurgersService.deleteUserResponse(loginUserDeserialization.getAccessToken());
         }
-        CreateUserDeserialization createUserDeserialization = stellarBurgersService.createUserResponse(JSON_TO_CREATE_USER).as(CreateUserDeserialization.class);
+        CreateUserDeserialization createUserDeserialization = stellarBurgersService.createUserResponse(userData).as(CreateUserDeserialization.class);
         accessToken = createUserDeserialization.getAccessToken();
     }
     @Test
+    @DisplayName("Take user orders")
+    @Description("Test for take user orders using authorization in request. Using /api/orders")
     public void takeOrdersWithAuth(){
         List<Integer> numbersOfCreatedOrders = new ArrayList<>();
         List<Integer> numbersOfUserOrders = new ArrayList<>();
+        Map<String, List<String>> mapIngredients = new HashMap<>(stellarBurgersService.takeIngredientsToMap());
         CreateOrderDeserialization createOrderDeserialization = stellarBurgersService
                 .createOrderResponseWithAuth(accessToken,
-                        "{\"ingredients\": [\"61c0c5a71d1f82001bdaaa7a\",\"61c0c5a71d1f82001bdaaa78\",\"61c0c5a71d1f82001bdaaa70\"]}").as(CreateOrderDeserialization.class);
+                        mapIngredients).as(CreateOrderDeserialization.class);
         numbersOfCreatedOrders.add(createOrderDeserialization.getOrder().getNumber());
+        mapIngredients.putAll(stellarBurgersService.takeIngredientsToMap());
         createOrderDeserialization = stellarBurgersService
                 .createOrderResponseWithAuth(accessToken,
-                        "{\"ingredients\": [\"61c0c5a71d1f82001bdaaa6d\",\"61c0c5a71d1f82001bdaaa6f\",\"61c0c5a71d1f82001bdaaa72\"]}").as(CreateOrderDeserialization.class);
+                        mapIngredients).as(CreateOrderDeserialization.class);
         numbersOfCreatedOrders.add(createOrderDeserialization.getOrder().getNumber());
         TakeOrderDeserialization takeOrderDeserialization = stellarBurgersService.takeOrderResponseWithAuth(accessToken).as(TakeOrderDeserialization.class);
-        for(int i = 0; i < takeOrderDeserialization.getOrders().size(); i++){
-            numbersOfUserOrders.add(takeOrderDeserialization.getOrders().get(i).getNumber());
+        for(Orders order : takeOrderDeserialization.getOrders()){
+            numbersOfUserOrders.add(order.getNumber());
         }
         Assert.assertEquals(numbersOfCreatedOrders, numbersOfUserOrders);
     }
     @Test
+    @DisplayName("Take orders without authorization")
+    @Description("Test for take orders without authorization in request. Using /api/orders")
     public void takeOrdersWithoutAuth(){
        Assert.assertEquals(401, stellarBurgersService.takeOrderResponseWithoutAuth().getStatusCode());
     }

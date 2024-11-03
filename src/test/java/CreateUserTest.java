@@ -1,3 +1,5 @@
+import io.qameta.allure.Description;
+import io.qameta.allure.junit4.DisplayName;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.*;
@@ -6,57 +8,71 @@ import ru.yandex.praktikum.pojo.createuser.CreateUserDeserialization;
 import ru.yandex.praktikum.StellarBurgersService;
 import ru.yandex.praktikum.pojo.loginuser.LoginUserDeserialization;
 
-import static ru.yandex.praktikum.StellarBurgersService.JSON_TO_LOGIN_USER;
+import java.util.Map;
 
 
 public class CreateUserTest {
     private CreateUserDeserialization createUserDeserialization;
     private StellarBurgersService stellarBurgersService;
     private static Response response;
-    private static final String JSON_TO_CREATE_USER = "{\"email\": \"ninja@yandex.ru\", \"password\": \"ninja123\", \"name\": \"ninja\"}";
+    private static Map<String,String> userData;
     @Rule
     public TestName testName = new TestName();
     @Before
     public void setUp() {
-        RestAssured.baseURI = "https://stellarburgers.nomoreparties.site";
         stellarBurgersService = new StellarBurgersService();
-        if(stellarBurgersService.loginUserResponse(JSON_TO_LOGIN_USER).getStatusCode() == 200){
-            LoginUserDeserialization loginUserDeserialization = stellarBurgersService.loginUserResponse(JSON_TO_LOGIN_USER).as(LoginUserDeserialization.class);
+        RestAssured.requestSpecification = StellarBurgersService.requestSpec;
+        userData = stellarBurgersService.userData();
+        if(stellarBurgersService.loginUserResponse(userData).getStatusCode() == 200){
+            LoginUserDeserialization loginUserDeserialization = stellarBurgersService.loginUserResponse(userData).as(LoginUserDeserialization.class);
             stellarBurgersService.deleteUserResponse(loginUserDeserialization.getAccessToken());
         }
     }
     @Test
+    @DisplayName("Create user")
+    @Description("Test for creating user. Using /api/auth/register")
     public void createUser(){
-        response = stellarBurgersService.createUserResponse(JSON_TO_CREATE_USER);
+        response = stellarBurgersService.createUserResponse(userData);
         Assert.assertEquals(200, response.getStatusCode());
         createUserDeserialization = response.as(CreateUserDeserialization.class);
     }
     @Test
+    @DisplayName("Create user two times")
+    @Description("Test for creating user using same request twice. Using /api/auth/register")
     public void createUserTwoTimes(){
-        Response firstResponse = stellarBurgersService.createUserResponse(JSON_TO_CREATE_USER);
-        Response secondResponse = stellarBurgersService.createUserResponse(JSON_TO_CREATE_USER);
+        Response firstResponse = stellarBurgersService.createUserResponse(userData);
+        Response secondResponse = stellarBurgersService.createUserResponse(userData);
         Assert.assertEquals(403, secondResponse.getStatusCode());
         createUserDeserialization = firstResponse.as(CreateUserDeserialization.class);
     }
     @Test
+    @DisplayName("Create user without email")
+    @Description("Test for creating user without email field in request. Using /api/auth/register")
     public void createUserWithoutEmail(){
-        response = stellarBurgersService.createUserResponse("{\"password\": \"ninja123\", \"name\": \"ninja\"}");
+        userData.remove("email");
+        response = stellarBurgersService.createUserResponse(userData);
         Assert.assertEquals(403, response.getStatusCode());
         if(response.getStatusCode() == 200) {
             createUserDeserialization = response.as(CreateUserDeserialization.class);
         }
     }
     @Test
+    @DisplayName("Create user without password")
+    @Description("Test for creating user without password field in request. Using /api/auth/register")
     public void createUserWithoutPassword(){
-        response = stellarBurgersService.createUserResponse("{\"email\": \"ninja@yandex.ru\", \"name\": \"ninja\"}");
+        userData.remove("password");
+        response = stellarBurgersService.createUserResponse(userData);
         Assert.assertEquals(403, response.getStatusCode());
         if(response.getStatusCode() == 200) {
             createUserDeserialization = response.as(CreateUserDeserialization.class);
         }
     }
     @Test
+    @DisplayName("Create user without name")
+    @Description("Test for creating user without name field in request. Using /api/auth/register")
     public void createUserWithoutName(){
-        response = stellarBurgersService.createUserResponse("{\"email\": \"ninja@yandex.ru\", \"password\": \"ninja123\"}");
+        userData.remove("name");
+        response = stellarBurgersService.createUserResponse(userData);
         Assert.assertEquals(403, response.getStatusCode());
         if(response.getStatusCode() == 200) {
             createUserDeserialization = response.as(CreateUserDeserialization.class);
